@@ -74,12 +74,12 @@ angular.module('Cards', ['Game'])
 	registerStatusCard('Amulet of Protection', {
 		description: 'Tonight you are protected from all nighttime attacks. Tomorrow night, however, you must indicate and pass this amulet on. If the player holding this card dies during the day, the amulet returns to the enchanter and the cycle starts over.',
 		relatedRoleName: 'Enchanter',
-		autoIndicate: true,
+		autoIndicate: GameHelper.AutoIndicate.EveryNight,
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.selectPlayer('Select a player to pass the Amulet on to.').then(function(selectedPlayer) {
 				GameHelper.revokeStatusCard(originPlayer, 'Amulet of Protection');
 				GameHelper.assignStatusCard(selectedPlayer, 'Amulet of Protection');
-				GameHelper.markPlayerProtected(selectedPlayer);
+				GameHelper.markPlayerProtected(selectedPlayer, originPlayer);
 			}).then(resolve, reject);
 		}
 	});
@@ -94,7 +94,7 @@ angular.module('Cards', ['Game'])
 		relatedRoleName: 'Power Broker',
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.selectPlayer().then(function(selectedPlayer) {
-				GameHelper.markPlayerProtected(selectedPlayer);
+				GameHelper.markPlayerProtected(selectedPlayer, originPlayer);
 			}).then(resolve, reject);
 		}
 	});
@@ -150,7 +150,7 @@ angular.module('Cards', ['Game'])
 			if (originPlayer.alignment == Alignments.Illuminati.name) {
 				GameHelper.selectPlayers(3, 'Select three consecutive players to kill.').then(function(players) {
 					players.forEach(function(p) {
-						GameHelper.markPlayerTargeted(p);
+						GameHelper.markPlayerTargeted(p, originPlayer);
 					});
 				}).then(resolve, reject);
 			} else {
@@ -191,7 +191,7 @@ angular.module('Cards', ['Game'])
 				}
 				
 				if (dragonPlayer != null) {
-					GameHelper.markPlayerTargeted(selectedPlayer);
+					GameHelper.markPlayerTargeted(selectedPlayer, originPlayer);
 					
 					return GameHelper.showAlert('The Knight has found the Dragon! The Dragon has been marked as targeted. If the Dragon dies, remove this status card from this player and assign them the Dragon Slayer status card.');
 				} else {
@@ -216,7 +216,7 @@ angular.module('Cards', ['Game'])
 		relatedRoleName: 'Power Broker',
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.selectPlayer().then(function(selectedPlayer) {
-				GameHelper.markPlayerTargeted(selectedPlayer);
+				GameHelper.markPlayerTargeted(selectedPlayer, originPlayer);
 			}).then(resolve, reject);
 		}
 	});
@@ -252,7 +252,7 @@ angular.module('Cards', ['Game'])
 		relatedRoleName: 'Werewolf Charmer',
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.selectPlayer().then(function(selectedPlayer) {
-				GameHelper.markPlayerTargeted(selectedPlayer);
+				GameHelper.markPlayerTargeted(selectedPlayer, originPlayer);
 			}).then(resolve, reject);
 		}
 	});
@@ -374,11 +374,11 @@ angular.module('Cards', ['Game'])
 				});
 			}).then(function(i, choice) {
 				if (i == 0) {
-					GameHelper.markPlayerProtected(originPlayer);
-					GameHelper.markPlayerProtected(currentSpaceship);
+					GameHelper.markPlayerProtected(originPlayer, originPlayer);
+					GameHelper.markPlayerProtected(currentSpaceship, originPlayer);
 				} else if (i == 1) {
 					return GameHelper.selectPlayer('Select a player to attack.').then(function(selectedPlayer) {
-						GameHelper.markPlayerTargeted(selectedPlayer);
+						GameHelper.markPlayerTargeted(selectedPlayer, originPlayer);
 					});
 				}
 			}).then(resolve, reject);
@@ -405,7 +405,7 @@ angular.module('Cards', ['Game'])
 		description: 'Kill anyone sitting exactly two players away from you.',
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.selectPlayer().then(function(selectedPlayer) {
-				GameHelper.markPlayerTargeted(selectedPlayer);
+				GameHelper.markPlayerTargeted(selectedPlayer, originPlayer);
 			}).then(resolve, reject);
 		}
 	});
@@ -419,11 +419,10 @@ angular.module('Cards', ['Game'])
 				yesno: true
 			}).then(function(isProtecting) {
 				GameHelper.getAllPlayers().forEach(function(p) {
-					var opts = { player: p, origin: originPlayer };
 					if (isProtecting) {
-						GameHelper.markPlayerProtected(opts);
+						GameHelper.markPlayerProtected(p, originPlayer);
 					} else {
-						GameHelper.markPlayerCursed(opts);
+						GameHelper.markPlayerCursed(p, originPlayer);
 					}
 				});
 			}).then(resolve, reject);
@@ -435,7 +434,7 @@ angular.module('Cards', ['Game'])
 		description: 'Select one player you suspect is your enemy. Assassinate them.',
 		indicate: function(originPlayer) {
 			GameHelper.selectPlayer().then(function(selectedPlayer) {
-				GameHelper.markPlayerTargeted(selectedPlayer);
+				GameHelper.markPlayerTargeted(selectedPlayer, originPlayer);
 			}).then(resolve, reject);
 		}
 	});
@@ -600,9 +599,9 @@ angular.module('Cards', ['Game'])
 					options: ['Killing', 'Protecting']
 				}).then(function(i, choice) {
 					if (i == 0) {
-						GameHelper.markPlayerTargeted(master);
+						GameHelper.markPlayerTargeted(master, originPlayer);
 					} else if (i == 1) {
-						GameHelper.markPlayerProtected(master);
+						GameHelper.markPlayerProtected(master, originPlayer);
 					}
 				}).then(resolve, reject);
 			});
@@ -686,7 +685,7 @@ angular.module('Cards', ['Game'])
 				});
 			}).then(function(targetPlayer, actionIndex, action) {
 				if (actionIndex == 0) {
-					GameHelper.markPlayerTargeted(targetPlayer);
+					GameHelper.markPlayerTargeted(targetPlayer, originPlayer);
 				} else if (actionIndex == 1) {
 					var currentShields = GameHelper.getRoleAttr(originPlayer, 'Death Shields');
 					currentShields.push(targetPlayer);
@@ -703,15 +702,15 @@ angular.module('Cards', ['Game'])
 		note: 'If the narrator has the Dynamite! Card when it explodes, the player who indicated it dies.',
 		numUses: 2,
 		indicate: function(originPlayer, resolve, reject) {
-			GameHelper.selectPlayer().then(function(selectedPlayer) {
-				var markedPlayers = GameHelper.getPlayersWithStatusCard('Dynamite!');
-				
-				if (markedPlayers.length == 0) {
-					GameHelper.assignStatusCard(markedPlayers[0], 'Dynamite!');
-				} else {
-					GameHelper.markPlayerTargeted(selectedPlayer);
-				}
-			}).then(resolve, reject);
+			var markedPlayers = GameHelper.getPlayersWithStatusCard('Dynamite!');
+			if (markedPlayers.length == 0) {
+				GameHelper.selectPlayer().then(function(selectedPlayer) {
+					GameHelper.assignStatusCard(selectedPlayer, 'Dynamite!');
+				}).then(resolve, reject);
+			} else {
+				GameHelper.markPlayerTargeted(markedPlayers[0], originPlayer);
+				resolve();
+			}
 		}
 	});
 	
@@ -730,12 +729,12 @@ angular.module('Cards', ['Game'])
 				GameHelper.showAlert('Allow the Dinosaur to investigate two players.').then(resolve);
 			} else if (currentStage == 'One') {
 				GameHelper.selectPlayer('Select a player to protect.').then(function(selectedPlayer) {
-					GameHelper.markPlayerProtected(selectedPlayer);
+					GameHelper.markPlayerProtected(selectedPlayer, originPlayer);
 					GameHelper.setRoleAttr(originPlayer, 'Stage', 'Two');
 				}).then(resolve, reject);
 			} else if (currentStage == 'Two') {
 				GameHelper.selectPlayer('Select a player to protect.').then(function(selectedPlayer) {
-					GameHelper.markPlayerTargeted(selectedPlayer);
+					GameHelper.markPlayerTargeted(selectedPlayer, originPlayer);
 					GameHelper.setRoleAttr(originPlayer, 'Stage', 'Three');
 				}).then(resolve, reject)
 			} else {
@@ -751,7 +750,7 @@ angular.module('Cards', ['Game'])
 		numUses: -1,
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.selectPlayer().then(function(selectedPlayer) {
-				GameHelper.markPlayerProtected(selectedPlayer);
+				GameHelper.markPlayerProtected(selectedPlayer, originPlayer);
 			}).then(resolve, reject);
 		}
 	});
@@ -778,7 +777,7 @@ angular.module('Cards', ['Game'])
 		note: 'Count the nights! Also, if two Detectives or Illuminati (depending on the team) are equally close to Dr. Frankenstein so neither is the nearest, simply pick one to kill.',
 		indicate: function(originPlayer, resolve, reject) {
 			// Protect player for night one...
-			GameHelper.markPlayerProtected(originPlayer);
+			GameHelper.markPlayerProtected(originPlayer, originPlayer);
 			
 			// Then wait a night...
 			GameHelper.wait({
@@ -786,7 +785,7 @@ angular.module('Cards', ['Game'])
 				timeOfDay: GameHelper.TurnPhase.Night
 			}).then(function() {
 				// Then protect player for night two...
-				return GameHelper.markPlayerProtected(originPlayer);
+				return GameHelper.markPlayerProtected(originPlayer, originPlayer);
 			}).then(function() {
 				// Then wait another night...
 				return GameHelper.wait({
@@ -802,8 +801,8 @@ angular.module('Cards', ['Game'])
 					targetAlignment = Alignments.Detective.name;
 				}
 				
-				GameHelper.selectPlayer('Select the nearest ' + targetAlignment + ' for Dr. Frankenstein\'s monster to kill.').then(function(selectedPlayer) {
-					GameHelper.markPlayerTargeted(selectedPlayer);
+				GameHelper.selectPlayer('Select the nearest ' + targetAlignment + ' from ' + originPlayer.name + ' for Dr. Frankenstein\'s monster to kill.').then(function(selectedPlayer) {
+					GameHelper.markPlayerTargeted(selectedPlayer, originPlayer);
 				});
 			});
 			
@@ -837,7 +836,7 @@ angular.module('Cards', ['Game'])
 				return GameHelper.selectPlayer();
 			}).then(function(selectedPlayer) {
 				if (GameHelper.playerHasStatusCard(selectedPlayer, 'Knight')) {
-					GameHelper.markPlayerTargeted(originPlayer);
+					GameHelper.markPlayerTargeted(originPlayer, originPlayer);
 					
 					return GameHelper.showAlert('The Dragon has plundered the Knight, revealing its location. The Knight has slain the Dragon. Assign the Knight the Dragon Slayer status card.');
 				}
@@ -893,12 +892,12 @@ angular.module('Cards', ['Game'])
 			if (GameHelper.roleUsesLeft(originPlayer) == 2) {
 				GameHelper.revokeStatusCardFromAll('Amulet of Protection');
 				GameHelper.assignStatusCard(originPlayer, 'Amulet of Protection');
-				GameHelper.markPlayerProtected(originPlayer);
+				GameHelper.markPlayerProtected(originPlayer, originPlayer);
 				resolve();
 			} else {
 				GameHelper.selectPlayer('Select a player to permanently curse.').then(function(selectedPlayer) {
 					var cursePlayer = function() {
-						GameHelper.markPlayerCursed(selectedPlayer);
+						GameHelper.markPlayerCursed(selectedPlayer, originPlayer);
 						GameHelper.wait({
 							numDays: 1,
 							timeOfDay: GameHelper.TurnPhase.Night
@@ -951,12 +950,12 @@ angular.module('Cards', ['Game'])
 				} else if (i == 1) { // Protect
 					return GameHelper.selectPlayers(2).then(function(players) {
 						players.forEach(function(p) {
-							GameHelper.markPlayerProtected(p);
+							GameHelper.markPlayerProtected(p, originPlayer);
 						});
 					});
 				} else if (i == 2) { // Kill
 					return GameHelper.selectPlayer().then(function(selectedPlayer) {
-						GameHelper.markPlayerTargeted(selectedPlayer);
+						GameHelper.markPlayerTargeted(selectedPlayer, originPlayer);
 					});
 				}
 			}).then(resolve, reject);
@@ -986,7 +985,7 @@ angular.module('Cards', ['Game'])
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.selectPlayer().then(function(selectedPlayer) {
 				var protectPlayer = function() {
-					GameHelper.markPlayerProtected(selectedPlayer);
+					GameHelper.markPlayerProtected(selectedPlayer, originPlayer);
 					GameHelper.wait({
 						numDays: 1,
 						timeOfDay: GameHelper.TurnPhase.Night
@@ -1008,11 +1007,54 @@ angular.module('Cards', ['Game'])
 					options: [originPlayer.name, selectedPlayer.name]
 				}).then(function(i, choice) {
 					if (i == 0) {
-						GameHelper.markPlayerTargeted(originPlayer);
+						GameHelper.markPlayerTargeted(originPlayer, originPlayer);
 					} else if (i == 1) {
-						GameHelper.markPlayerTargeted(selectedPlayer);
+						GameHelper.markPlayerTargeted(selectedPlayer, originPlayer);
 					}
 				});
+			}).then(resolve, reject);
+		}
+	});
+	
+	registerRole('Historian', {
+		phase: GameHelper.Phases.Night,
+		description: 'Make a player other than yourself Town Hero; they only die during the day if voted out unanimously.',
+		indicate: function(originPlayer, resolve, reject) {
+			GameHelper.selectPlayer().then(function(selectedPlayer) {
+				GameHelper.assignStatusCard(selectedPlayer, 'Town Hero');
+			}).then(resolve, reject);
+		}
+	});
+	
+	registerRole('Hitman', {
+		phase: GameHelper.Phases.Night,
+		description: 'Indicate any turn to kill the Mayor or Dictator.',
+		indicate: function(originPlayer, resolve, reject) {
+			var mayors = GameHelper.getPlayersWithStatusCard('Mayor');
+			var dictators = GameHelper.getPlayersWithStatusCard('Dictator');
+			var playerToKill;
+			
+			if (mayors.length) {
+				playerToKill = mayors[0];
+			} else if (dictators.length) {
+				playerToKill = dictators[0];
+			}
+			
+			if (playerToKill) {
+				GameHelper.markPlayerTargeted(playerToKill, originPlayer);
+				resolve();
+			} else {
+				GameHelper.showAlert('There is no Mayor or Dictator.').then(reject);
+			}
+		}
+	});
+	
+	registerRole('Huntsman', {
+		description: 'If you die, you\'re taking a player of your choice with you.',
+		autoIndicate: GameHelper.AutoIndicate.UponDeath,
+		indicate: function(originPlayer, resolve, reject) {
+			GameHelper.selectPlayer().then(function(selectedPlayer) {
+				GameHelper.markPlayerTargeted(selectedPlayer, originPlayer);
 			}).then(resolve, reject);
 		}
 	});
@@ -1023,7 +1065,7 @@ angular.module('Cards', ['Game'])
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.selectPlayers(3, 'Select three consecutive players.').then(function(players) {
 				for (var i = 0; i < players.length; i++) {
-					GameHelper.markPlayerCursed(players[i]);
+					GameHelper.markPlayerCursed(players[i], originPlayer);
 				}
 			}).then(resolve, reject);
 		}
