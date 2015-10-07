@@ -359,7 +359,7 @@ angular.module('Cards', ['Game'])
 			}
 			
 			GameHelper.prompt({
-				title: 'Is the Alien sitting next to ' + currentSpaceship.name + '? And is ' + currentSpaceship.name + ' alive?',
+				text: 'Is the Alien sitting next to ' + currentSpaceship.name + '? And is ' + currentSpaceship.name + ' alive?',
 				yesno: true
 			}).then(function(isValid) {
 				return $q(function(resolve, reject) {
@@ -367,7 +367,7 @@ angular.module('Cards', ['Game'])
 						reject();
 					} else {
 						GameHelper.prompt({
-							title: 'Would the Alien like to protect themself and their spaceship, or attack one player?',
+							text: 'Would the Alien like to protect themself and their spaceship, or attack one player?',
 							options: ['Protect', 'Attack']
 						}).then(resolve, reject);
 					}
@@ -415,7 +415,7 @@ angular.module('Cards', ['Game'])
 		description: 'You have gained sentience! Choose to either protect the humans, or attempt to annihilate them (protect or curse the town for one night).',
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.prompt({
-				title: 'Is the AI protecting the town?',
+				text: 'Is the AI protecting the town?',
 				yesno: true
 			}).then(function(isProtecting) {
 				GameHelper.getAllPlayers().forEach(function(p) {
@@ -580,7 +580,7 @@ angular.module('Cards', ['Game'])
 				}
 				
 				GameHelper.prompt({
-					title: 'Select a new master?',
+					text: 'Select a new master?',
 					yesno: true
 				}).then(function(selectNewMaster) {
 					if (selectNewMaster) {
@@ -595,7 +595,7 @@ angular.module('Cards', ['Game'])
 				}).then(resolve, reject);
 			}, function() {
 				GameHelper.prompt({
-					title: 'Is the butler killing or protecting the current master?',
+					text: 'Is the butler killing or protecting the current master?',
 					options: ['Killing', 'Protecting']
 				}).then(function(i, choice) {
 					if (i == 0) {
@@ -675,7 +675,7 @@ angular.module('Cards', ['Game'])
 		numUses: 3,
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.prompt({
-				title: 'Is the Dark Lord killing or creating a Death Shield?',
+				text: 'Is the Dark Lord killing or creating a Death Shield?',
 				options: ['Kill', 'Death Shield']
 			}).then(function(i, choice) {
 				return $q(function(resolve, reject) {
@@ -857,7 +857,7 @@ angular.module('Cards', ['Game'])
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.showAlert('Follow the directions in the description. Continue when a consensus is reached.').then(function() {
 				return GameHelper.prompt({
-					title: 'What action was taken?',
+					text: 'What action was taken?',
 					options: ['Mayor appointed', 'Dictator appointed', 'No action']
 				});
 			}).then(function(i, choice) {
@@ -942,7 +942,7 @@ angular.module('Cards', ['Game'])
 		note: 'For the three investigated players, indicate whether or not they are an Illuminati or a Detective, but do not specify which.',
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.prompt({
-				title: 'What is the player\'s wish?',
+				text: 'What is the player\'s wish?',
 				options: ['Investigate three players', 'Protect two players', 'Kill one player']
 			}).then(function(i, choice) {
 				if (i == 0) { // Investigate
@@ -1003,7 +1003,7 @@ angular.module('Cards', ['Game'])
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.selectPlayer('Select a player to duel.').then(function(selectedPlayer) {
 				return GameHelper.prompt({
-					title: 'Who did the town vote dead?',
+					text: 'Who did the town vote dead?',
 					options: [originPlayer.name, selectedPlayer.name]
 				}).then(function(i, choice) {
 					if (i == 0) {
@@ -1055,6 +1055,133 @@ angular.module('Cards', ['Game'])
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.selectPlayer().then(function(selectedPlayer) {
 				GameHelper.markPlayerTargeted(selectedPlayer, originPlayer);
+			}).then(resolve, reject);
+		}
+	});
+	
+	registerRole('Hydra', {
+		phase: GameHelper.Phases.Night,
+		description: 'Pick someone to be a hydra head. Each time a head dies, you may indicate in order to pick two more. Your heads cannot attack you.',
+		note: 'You\'ll want to mark which player is Hydra along with which players are hydra heads so you don\'t accidentally allow a head to kill Hydra.',
+		numUses: -1,
+		attributes: {
+			'Hydra Heads': GameHelper.RoleAttributes.SelectPlayer(1)
+		},
+		indicate: function(originPlayer, resolve, reject) {
+			var currentHeads = GameHelper.getRoleAttr(currentPlayer, 'Hydra Heads');
+			var playerPromise;
+			if (currentHeads.length == 0) {
+				playerPromise = GameHelper.selectPlayer('Choose the first hydra head.');
+			} else {
+				playerPromise = GameHelper.selectPlayers(2, 'Choose two new hydra heads, only if a hydra head has died.');
+			}
+			
+			playerPromise.then(function(newHeads) {
+				currentHeads = currentHeads.concat(newHeads);
+				GameHelper.setRoleAttr(currentPlayer, 'Hydra Heads', currentHeads);
+			}).then(resolve, reject);
+		}
+	});
+	
+	registerRole('Informant', {
+		phase: GameHelper.Phases.Night,
+		description: 'Learn who the Detectives are.',
+		note: 'Some roles allow players to join the Detectives. Identify all players who wake up with the Detectives tonight.'
+	});
+	
+	registerRole('Insomniac', {
+		phase: GameHelper.Phases.Night,
+		description: 'Indicate once. Then, you may peek during the night. Careful: if caught, you may make enemies.',
+		note: 'Players who peek are kicked out of the game. Once this player indicates, mark who they are and remember: they can peek!',
+		indicate: function(originPlayer, resolve, reject) {
+			GameHelper.showAlert('This player can peek during the night for the rest of the game.').then(resolve);
+		}
+	});
+	
+	registerRole('Inventor', {
+		phase: GameHelper.Phases.Night,
+		description: 'Invent a force field to surround three neighboring players; they are protected from nighttime attacks for one night.',
+		indicate: function(originPlayer, resolve, reject) {
+			GameHelper.selectPlayers(3).then(function(players) {
+				players.forEach(function(p) {
+					GameHelper.markPlayerProtected(p, originPlayer);
+				});
+			}).then(resolve, reject);
+		}
+	});
+	
+	registerRole('Jekyll and Hyde', {
+		description: 'Hyde by night, Jekyll by day. If the last kill of the game is by night, you win with the illuminati; if by day, the Citizens.',
+		numUses: 0
+	});
+	
+	registerRole('Journalist', {
+		phase: GameHelper.Phases.Night,
+		description: 'Select one player. You write an exposé on them. Their role (but not their alignment) will be publicly revealed the next day.',
+		note: 'Make sure to note whose role you need to reveal.',
+		indicate: function(originPlayer, resolve, reject) {
+			GameHelper.selectPlayer('Select the player whose role will be revealed in the morning.').then(function(selectedPlayer) {
+				GameHelper.wait({
+					numDays: 1,
+					timeOfDay: GameHelper.TurnPhase.Morning
+				}).then(function() {
+					GameHelper.showAlert('The Journalist\'s exposé was on ' + selectedPlayer.name + ', and their role is the ' + selectedPlayer.roleName + '!');
+				});
+			}).then(resolve, reject);
+		}
+	});
+	
+	registerRole('Judge', {
+		phase: GameHelper.Phases.Day,
+		description: 'Pardon somebody who was voted out.'
+	});
+	
+	registerRole('Juggernaut', {
+		phase: GameHelper.Phases.Day,
+		description: 'You\'re one tough cookie; you get one extra life. Once marked to die, reveal your role to the Narrator (and nobody else) to keep playing.'
+	});
+	
+	registerRole('Jury', {
+		phase: GameHelper.Phases.Day,
+		description: 'Any one day you may cancel the vote and pass your own verdict, sentencing a player of your choice to death.'
+	});
+	
+	registerRole('Kamikaze', {
+		phase: GameHelper.Phases.Night,
+		description: 'Target one player. You both die.',
+		indicate: function(originPlayer, resolve, reject) {
+			GameHelper.selectPlayer().then(function(selectedPlayer) {
+				GameHelper.markPlayerTargeted(selectedPlayer, originPlayer);
+				GameHelper.markPlayerTargeted(originPlayer, originPlayer);
+			}).then(resolve, reject);
+		}
+	});
+	
+	registerRole('Kidnapper', {
+		phase: GameHelper.Phases.Day,
+		description: 'Pick two people: a hostage and a demand. If the town doesn\'t execute your demand (vote out that player), your hostage will die (along with whoever the town voted out).'
+	});
+	
+	registerRole('Lawyer', {
+		phase: GameHelper.Phases.Day,
+		description: 'By using power of attorney, you may change one player\'s vote to match yours that day.'
+	});
+	
+	registerRole('Leech', {
+		phase: GameHelper.Phases.Day,
+		description: 'Select two players: you will leech one use of the first player\'s role and gift the second player an additional use of their role. Infinite roles gain no uses, but may lose one use (i.e., the leeched player can\'t go for one turn).',
+		indicate: function(originPlayer, resolve, reject) {
+			GameHelper.selectPlayer('Choose the player to lose a use of their role.').then(function(firstPlayer) {
+				var deferred = $q.defer();
+				
+				GameHelper.selectPlayer('Choose the player to gain an extra use of their role').then(function(secondPlayer) {
+					deferred.resolve(firstPlayer, secondPlayer);
+				}, deferred.reject);
+				
+				return deferred;
+			}).then(function(firstPlayer, secondPlayer) {
+				GameHelper.decrementRoleUses(firstPlayer);
+				GameHelper.incrementRoleUses(secondPlayer);
 			}).then(resolve, reject);
 		}
 	});
