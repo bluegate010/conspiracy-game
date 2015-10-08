@@ -646,10 +646,7 @@ angular.module('Cards', ['Game'])
 					newAlignment = Alignments.Citizen.name;
 				}
 				
-				GameHelper.setPlayerAlignment({
-					player: originPlayer,
-					alignmentName: newAlignment
-				});
+				GameHelper.setPlayerAlignment(originPlayer, newAlignment);
 			}).then(resolve);
 		}
 	});
@@ -1170,6 +1167,7 @@ angular.module('Cards', ['Game'])
 	registerRole('Leech', {
 		phase: GameHelper.Phases.Day,
 		description: 'Select two players: you will leech one use of the first player\'s role and gift the second player an additional use of their role. Infinite roles gain no uses, but may lose one use (i.e., the leeched player can\'t go for one turn).',
+		note: 'Even if the leeched player has no uses to lose or the gifted player can\'t gain uses, do not reveal the number of roles for any player.',
 		indicate: function(originPlayer, resolve, reject) {
 			GameHelper.selectPlayer('Choose the player to lose a use of their role.').then(function(firstPlayer) {
 				var deferred = $q.defer();
@@ -1182,6 +1180,91 @@ angular.module('Cards', ['Game'])
 			}).then(function(firstPlayer, secondPlayer) {
 				GameHelper.decrementRoleUses(firstPlayer);
 				GameHelper.incrementRoleUses(secondPlayer);
+			}).then(resolve, reject);
+		}
+	});
+	
+	registerRole('Loan Shark', {
+		phase: GameHelper.Phases.Night,
+		description: 'Pick someone; loan them your life. For two nights, if they\'re targeted, you die. Then, for three nights, if you\'re targeted, they die.',
+		note: 'You\'ll want to record the two players involved in the loan and count the nights for as many turns as necessary.',
+		indicate: function(originPlayer, resolve, reject) {
+			GameHelper.selectPlayer().then(function(selectedPlayer) {
+				var showFirstAlert = function() {
+					return GameHelper.showAlert('If ' + selectedPlayer.name + ' is targeted, ' + originPlayer.name + ' dies.');
+				};
+				
+				var showSecondAlert = function() {
+					return GameHelper.showAlert('If ' + originPlayer.name + ' is targeted, ' + selectedPlayer.name + ' dies.');
+				};
+				
+				var waitTillMorning = function() {
+					return GameHelper.wait({
+						numDays: 1,
+						timeOfDay: GameHelper.TurnPhase.Morning
+					});
+				};
+				
+				waitTillMorning()
+					.then(showFirstAlert)  // Show message the morning after
+					.then(waitTillMorning)
+					.then(showFirstAlert)  // Show message second morning
+					.then(waitTillMorning)
+					.then(showSecondAlert) // Switch to second message
+					.then(waitTillMorning)
+					.then(showSecondAlert) // Show it the second night
+					.then(waitTillMorning)
+					.then(showSecondAlert) // And the third night
+			}).then(resolve, reject);
+		}
+	});
+	
+	registerRole('Lobbyist', {
+		phase: GameHelper.Phases.Night,
+		description: 'Select a player; bribe them to join your team (they cannot refuse). If they\'re already on your team, try another player another night.',
+		note: 'The lobbyist will sleep while you wake up the targeted player to check their alignment.',
+		indicate: function(originPlayer, resolve, reject) {
+			GameHelper.selectPlayer().then(function(selectedPlayer) {
+				var originAlignment = originPlayer.alignment;
+				var selectedAlignment = selectedPlayer.alignment;
+				
+				var newAlignment;
+				if ([Alignments.Illuminati.name, Alignments.Conspirator.name].indexOf(currentAlignment) != -1) {
+					switch (selectedAlignment) {
+						case Alignments.Illuminati.name:
+						case Alignments.Conspirator.name:
+							newAlignment = null;
+							break;
+						case Alignments.Detective.name:
+							newAlignment = Alignments.Illuminati.name;
+							break;
+						case Alignments.Citizen.name:
+							newAlignment = Alignments.Conspirator.name;
+							break;
+					}
+				} else if ([Alignments.Detective.name, Alignments.Citizen.name].indexOf(currentAlignment) != -1) {
+					switch (selectedAlignment) {
+						case Alignments.Detective.name:
+						case Alignments.Citizen.name:
+							newAlignment = null;
+							break;
+						case Alignments.Illuminati.name:
+							newAlignment = Alignments.Detective.name;
+							break;
+						case Alignments.Conspirator.name:
+							newAlignment = Alignments.Citizen.name;
+							break;
+					}
+				}
+				
+				if (newAlignment) {
+					return GameHelper.showAlert('Switching player ' + selectedPlayer.name + ' to ' + newAlignment + '. Tap them on the head to notify them.').then(function() {
+						GameHelper.setPlayerAlignment(selectedPlayer, newAlignment);
+						GameHelper.sendPlayerMessage(selectedPlayer, 'Your alignment has been switched.');
+					});
+				} else {
+					return GameHelper.showAlert('The selected player is already on the Lobbyist\'s side. The Lobbyist can go another night.').then($q.reject())
+				}
 			}).then(resolve, reject);
 		}
 	});
